@@ -900,7 +900,7 @@ function renderChartMultiSeries(meta) {
 
     if (multiSeriesMode === 'stacked') {
       return `<div class="chart-row">
-        <div class="chart-label${isTop ? ' top' : ''}" title="${escapeHtml(device.name)}">${escapeHtml(device.name)}</div>
+        <button type="button" class="chart-label${isTop ? ' top' : ''}" data-device-id="${escapeHtml(device.id)}" title="${escapeHtml(device.name)}">${escapeHtml(device.name)}</button>
         <div class="chart-track chart-track-stacked">
           ${buildStackedSegments(device, meta, globalMax)}
         </div>
@@ -908,7 +908,7 @@ function renderChartMultiSeries(meta) {
       </div>`;
     } else {
       return `<div class="chart-row chart-row-grouped">
-        <div class="chart-label${isTop ? ' top' : ''}" title="${escapeHtml(device.name)}">${escapeHtml(device.name)}</div>
+        <button type="button" class="chart-label${isTop ? ' top' : ''}" data-device-id="${escapeHtml(device.id)}" title="${escapeHtml(device.name)}">${escapeHtml(device.name)}</button>
         <div class="chart-track-group">
           ${buildGroupedTracks(device, meta, globalMax)}
         </div>
@@ -960,6 +960,12 @@ function renderChartMultiSeries(meta) {
       renderChart();
     });
   });
+
+  chartBox.querySelectorAll('.chart-label[data-device-id]').forEach(label => {
+    label.addEventListener('click', () => {
+      openDeviceDetail(label.dataset.deviceId);
+    });
+  });
 }
 
 // ── Single-series chart ─────────────────────────────────────────────────────
@@ -997,7 +1003,7 @@ function renderChart() {
     const color = index < 3 ? topColors[index] : dimColor;
     const isTop = index < 3;
     return `<div class="chart-row">
-      <div class="chart-label${isTop ? ' top' : ''}" title="${escapeHtml(device.name)}">${escapeHtml(device.name)}</div>
+      <button type="button" class="chart-label${isTop ? ' top' : ''}" data-device-id="${escapeHtml(device.id)}" title="${escapeHtml(device.name)}">${escapeHtml(device.name)}</button>
       <div class="chart-track">
         <div class="chart-fill" data-w="${pct.toFixed(2)}" style="background:${color}"></div>
       </div>
@@ -1017,6 +1023,12 @@ function renderChart() {
       el.style.width = `${el.dataset.w}%`;
     });
   }));
+
+  chartBox.querySelectorAll('.chart-label[data-device-id]').forEach(label => {
+    label.addEventListener('click', () => {
+      openDeviceDetail(label.dataset.deviceId);
+    });
+  });
 }
 
 function setLoadingState() {
