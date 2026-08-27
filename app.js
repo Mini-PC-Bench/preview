@@ -206,10 +206,56 @@ const deviceDetailCloseBtn = document.getElementById('device-detail-close');
 const deviceDetailTitle = document.getElementById('device-detail-title');
 const deviceDetailSummary = document.getElementById('device-detail-summary');
 const deviceDetailBody = document.getElementById('device-detail-body');
+const siteHeader = document.querySelector('header');
+const tableWrap = document.querySelector('.table-wrap');
+let floatingTableHeader = null;
 
 const fmt = v => v == null ? '—' : v.toLocaleString();
 const fmtD = (v, d = 1) => v == null ? '—' : v.toFixed(d);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+function syncFloatingTableHeader() {
+  if (!floatingTableHeader) return;
+  const tableRect = benchmarkTable.getBoundingClientRect();
+  const wrapRect = tableWrap.getBoundingClientRect();
+  const headerHeight = siteHeader?.getBoundingClientRect().height ?? 0;
+  const sourceHeaders = benchmarkTable.querySelectorAll('thead th');
+  const floatingHeaders = floatingTableHeader.querySelectorAll('thead th');
+  const shouldShow = tableRect.top < headerHeight && tableRect.bottom > headerHeight;
+
+  floatingTableHeader.style.display = shouldShow ? 'block' : 'none';
+  if (!shouldShow) return;
+
+  floatingTableHeader.firstElementChild.style.width = `${tableRect.width}px`;
+  sourceHeaders.forEach((header, index) => {
+    const floatingHeader = floatingHeaders[index];
+    if (floatingHeader) {
+      floatingHeader.style.width = `${header.getBoundingClientRect().width}px`;
+    }
+  });
+  floatingTableHeader.style.left = `${wrapRect.left}px`;
+  floatingTableHeader.style.top = `${headerHeight}px`;
+  floatingTableHeader.style.width = `${wrapRect.width}px`;
+  floatingTableHeader.firstElementChild.style.transform = `translateX(-${tableWrap.scrollLeft}px)`;
+}
+
+function renderFloatingTableHeader() {
+  floatingTableHeader?.remove();
+  floatingTableHeader = document.createElement('div');
+  floatingTableHeader.className = 'floating-table-header';
+  floatingTableHeader.setAttribute('aria-hidden', 'true');
+  const table = benchmarkTable.cloneNode(false);
+  table.removeAttribute('id');
+  table.append(benchmarkTable.querySelector('thead').cloneNode(true));
+  floatingTableHeader.append(table);
+  document.body.append(floatingTableHeader);
+  floatingTableHeader.querySelectorAll('th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      benchmarkTable.querySelector(`th[data-col="${CSS.escape(th.dataset.col)}"]`)?.click();
+    });
+  });
+  syncFloatingTableHeader();
+}
 
 function normalizeDeviceLinks(rawLinks) {
   const links = [];
@@ -741,6 +787,7 @@ function renderTable() {
       openDeviceDetail(button.dataset.deviceId);
     });
   });
+  renderFloatingTableHeader();
 }
 
 function renderColumnPicker() {
@@ -1120,6 +1167,10 @@ deviceDetailCloseBtn.addEventListener('click', () => {
 deviceDetailOverlay.addEventListener('click', event => {
   if (event.target === deviceDetailOverlay) closeDeviceDetail();
 });
+
+window.addEventListener('scroll', syncFloatingTableHeader, { passive: true });
+window.addEventListener('resize', syncFloatingTableHeader);
+tableWrap.addEventListener('scroll', syncFloatingTableHeader, { passive: true });
 
 window.addEventListener('popstate', () => {
   if (!DEVICES.length) return;

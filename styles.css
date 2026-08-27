@@ -525,6 +525,25 @@ thead th:first-child {
   text-align: center;
   width: 48px;
   cursor: default;
+  background: #F8FAFC;
+}
+
+.floating-table-header {
+  position: fixed;
+  display: none;
+  overflow: hidden;
+  z-index: 90;
+  pointer-events: none;
+}
+
+.floating-table-header table {
+  margin: 0;
+  min-width: 1500px;
+  table-layout: fixed;
+}
+
+.floating-table-header th {
+  pointer-events: auto;
 }
 
 thead th.col-name {
