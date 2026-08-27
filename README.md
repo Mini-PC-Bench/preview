@@ -59,6 +59,47 @@ http://localhost:80/
 
 > **Note:** Port 80 requires an elevated PowerShell session. Alternatively, change the port in `serve.ps1` to anything above 1024 (e.g. `8123`) to run without Administrator privileges.
 
+## End-to-End Tests
+
+The E2E suite uses Playwright in Docker. Docker and Docker Compose are the only
+local prerequisites; Node.js, npm, Python, and browser binaries are not needed.
+
+Run all tests from the repository root:
+
+```bash
+docker compose up --build --abort-on-container-exit --exit-code-from e2e
+```
+
+The first run downloads the pinned Nginx and Playwright images and builds the
+test image. The site is available at `http://127.0.0.1:8080` while the
+containers are running.
+
+For quick iterations after changing site code or an E2E test, run:
+
+```bash
+docker compose run --rm e2e
+```
+
+The site files and test files are bind-mounted, so these changes do not require
+an image rebuild. Rebuild with `--build` when changing `Dockerfile.e2e`,
+`package.json`, the Playwright version, or other image/dependency setup:
+
+```bash
+docker compose up --build --abort-on-container-exit --exit-code-from e2e
+```
+
+Failed runs leave Playwright traces, screenshots, videos, and reports in
+`test-results/` and `playwright-report/`. These generated directories are
+ignored by Git. To run one file or one test during debugging:
+
+```bash
+docker compose run --rm e2e npx playwright test tests/e2e/theme.spec.js
+docker compose run --rm e2e npx playwright test -g "toggles and persists"
+```
+
+Every bug fix should include a regression test. See
+`.github/copilot-instructions.md` for the project testing and regression rules.
+
 ## Data Format
 
 `devices.json` must contain an array of device objects. Example:

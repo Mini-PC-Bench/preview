@@ -1,0 +1,21 @@
+services:
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - ${SITE_DIR:-.}:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    environment:
+      BASE_URL: http://web
+    depends_on:
+      - web
+    volumes:
+      - ./playwright-report:/tests/playwright-report
+      - ./test-results:/tests/test-results
+      - ./tests:/tests/tests:ro
+      - ./playwright.config.js:/tests/playwright.config.js:ro
