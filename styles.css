@@ -168,7 +168,43 @@ header {
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--muted);
+  text-decoration: none;
   transition: color .15s, border-color .15s;
+}
+
+a.tab-btn:last-child {
+  margin-left: auto;
+}
+
+.page-link {
+  padding: 0.6rem 1.25rem;
+  color: var(--muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.page-link:last-child {
+  margin-left: auto;
+}
+
+.page-link,
+.page-link:visited,
+.page-link:hover,
+.page-link:visited:hover {
+  text-decoration: none;
+}
+
+.page-link:visited {
+  color: var(--muted);
+}
+
+.page-link:hover,
+.page-link:visited:hover,
+.page-link-current,
+.page-link-current:visited {
+  color: var(--accent);
 }
 
 .tab-btn:hover {
@@ -187,6 +223,58 @@ header {
 
 .view.active {
   display: block;
+}
+
+.changelog-body {
+  max-width: 760px;
+  padding: 1.5rem 0 3rem;
+  line-height: 1.7;
+}
+
+.changelog-body h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
+}
+
+.changelog-body h2:first-child {
+  margin-top: 0;
+}
+
+.changelog-body h2.changelog-date {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0 0.5rem;
+  padding-top: 1rem;
+}
+
+.changelog-body p {
+  margin: 0.5rem 0;
+  color: var(--muted);
+}
+
+.changelog-body ul {
+  margin: 0.25rem 0 0.75rem 1.25rem;
+}
+
+.changelog-body li {
+  margin: 0.35rem 0;
+}
+
+.changelog-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  background: var(--accent-dim);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.changelog-body a {
+  color: var(--accent);
 }
 
 .info-grid {

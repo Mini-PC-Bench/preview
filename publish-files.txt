@@ -1,0 +1,9 @@
+index.html
+changelog.html
+styles.css
+app.js
+theme.js
+devices.json
+device-links.json
+favicon.ico
+favicon.svg

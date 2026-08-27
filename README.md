@@ -12,6 +12,11 @@ Static benchmark comparison page for mini PCs, designed to be hosted on GitHub P
 - `device-links.json` - editorial links keyed by device id
 - `source-device-map.json` - reviewed raw source-label ownership mappings used by the importer
 - `sync-device-links.ps1` - adds missing empty link entries from `devices.json`
+- `CHANGELOG.md` - project changelog (source of truth); edit this file
+- `changelog.template.html` - HTML layout for the generated changelog page
+- `build-changelog.ps1` - regenerates `changelog.html` from `CHANGELOG.md` and its template (`pwsh ./build-changelog.ps1`)
+- `changelog.html` - generated static changelog page, linked from the site header
+- `publish-files.txt` - allowlist of files and directories included in the GitHub Pages deployment
 
 ## GitHub Pages
 

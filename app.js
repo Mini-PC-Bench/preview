@@ -1064,9 +1064,9 @@ async function loadLinks() {
   }
 }
 
-document.querySelectorAll('.tab-btn').forEach(btn => {
+document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(item => item.classList.toggle('active', item === btn));
+    document.querySelectorAll('.tab-btn[data-view]').forEach(item => item.classList.toggle('active', item === btn));
     const view = btn.dataset.view;
     document.querySelectorAll('.view').forEach(panel => {
       panel.classList.toggle('active', panel.id === `${view}-view`);

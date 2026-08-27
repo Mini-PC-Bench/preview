@@ -1,0 +1,39 @@
+# Changelog
+
+All notable changes to this project are documented here.
+
+## 2026-08-27
+
+- Added this page to keep you up to date with site improvements.
+
+## 2026-08-26
+
+- Made mini PCs on the Charts view clickable, opening the same device detail popover as the Table view.
+
+## 2026-08-21
+
+- Added dark mode, with your preference remembered for future visits.
+
+## 2026-08-14 to 2026-08-20
+
+- Improved and expanded the links available alongside device results.
+
+## 2026-08-06
+
+- Added device detail pages with useful links that you can share.
+
+## 2026-06-04 to 2026-07-24
+
+- Expanded the comparison with new and updated mini PC results, including budget and gaming options.
+
+## 2026-04-26
+
+- Added richer chart comparisons for key performance, power, and acoustics results.
+
+## 2026-04-21
+
+- Introduced the Mini PC Benchmark Comparison dashboard with sortable results, custom columns, and a dedicated charts view.
+
+## 2026-04-12
+
+- Launched the first benchmark comparison, including CPU, graphics, encoding, power, and noise results.
