@@ -7,6 +7,7 @@ Static benchmark comparison page for mini PCs, designed to be hosted on GitHub P
 - `index.html` - main page markup
 - `styles.css` - page styles
 - `app.js` - client-side logic for loading data, rendering charts/table, and saving column visibility
+- `theme.js` - shared light/dark theme behavior for site pages
 - `devices.json` - benchmark dataset consumed by the page
 - `device-links.json` - editorial links keyed by device id
 - `source-device-map.json` - reviewed raw source-label ownership mappings used by the importer
