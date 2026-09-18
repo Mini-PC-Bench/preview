@@ -17,6 +17,7 @@
   --pow2: #10B981;
   --pow3: #34D399;
   --pow-dim: #94A3B8;
+  --wide-content-gutter: 6rem;
   /* Noise multi-series: green → amber → red (quiet → loud) */
   --noise1: #10B981;
   --noise2: #F59E0B;
@@ -334,6 +335,15 @@ a.tab-btn:last-child {
 
 .view.active {
   display: block;
+}
+
+@media (min-width: 1620px) {
+  main.container {
+    max-width: none;
+    width: calc(100vw - (var(--wide-content-gutter) * 2));
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .changelog-body {
