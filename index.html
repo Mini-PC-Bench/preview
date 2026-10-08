@@ -53,10 +53,12 @@
 
   <main class="container">
 
-    <!-- ── Table View ── -->
-    <div id="table-view" class="view active">
+    <div id="table-summary" class="table-summary">
+      <p id="info-grid-caption" class="info-grid-caption" hidden></p>
       <div id="info-grid" class="info-grid"></div>
+    </div>
 
+    <div id="filter-toolbar" class="filter-toolbar">
       <div class="controls">
         <div class="search-wrap">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -65,8 +67,11 @@
           </svg>
           <input id="search" type="search" placeholder="Filter by device name…" autocomplete="off" spellcheck="false">
         </div>
-        <span id="count" class="count"></span>
+        <span id="count" class="count" aria-live="polite"></span>
         <div class="table-actions">
+          <button id="filter-toggle" class="filter-toggle" type="button" aria-expanded="false" aria-controls="filter-panel">
+            Filters
+          </button>
           <button id="column-toggle" class="column-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="column-menu">
             Columns
           </button>
@@ -81,6 +86,12 @@
         </div>
       </div>
 
+      <div id="filter-chips" class="filter-chips" hidden></div>
+      <div id="filter-panel" class="filter-panel" hidden></div>
+    </div>
+
+    <!-- ── Table View ── -->
+    <div id="table-view" class="view active">
       <div class="table-wrap">
         <table id="benchmark-table"></table>
       </div>
