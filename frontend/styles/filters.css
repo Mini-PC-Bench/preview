@@ -178,6 +178,17 @@
   accent-color: var(--accent);
 }
 
+#filter-lan-speed {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
 .filter-actions {
   grid-column: 1 / -1;
 }

@@ -8,6 +8,8 @@ import { createCharts } from './frontend/charts.js';
 
 const DATA_URL = './devices.json';
 const LINKS_URL = './device-links.json';
+const SPECS_URL = './device-specs.json';
+const LAN_SPEEDS = [1000, 2500, 5000, 10000];
 const RECOMMENDATIONS_URL = './recommendations.json';
 const DEVICE_QUERY_PARAM = 'device';
 const COMPARE_QUERY_PARAM = 'compare';
@@ -29,6 +31,8 @@ let visibleColumns = new Set();
 let sortCol = 'composite';
 let sortDir = -1;
 let filterState = {
+  lanSpeed: null,
+  lanPorts: null,
   q: '',
   ranges: {},
   includeUnknown: false
@@ -167,6 +171,8 @@ function readFiltersFromUrl() {
 
   return {
     q: getUrlParam(QUERY_TEXT_PARAM) ?? '',
+    lanSpeed: LAN_SPEEDS.includes(Number(params.get('lan_min'))) ? Number(params.get('lan_min')) : null,
+    lanPorts: params.get('lan_ports_min') === '2' ? 2 : null,
     ranges,
     includeUnknown: params.get(INCLUDE_UNKNOWN_PARAM) === '1'
   };
@@ -181,6 +187,8 @@ function writeFilterStateToUrl({ replace = true } = {}) {
   });
 
   updates[INCLUDE_UNKNOWN_PARAM] = filterState.includeUnknown ? '1' : null;
+  updates.lan_min = filterState.lanSpeed;
+  updates.lan_ports_min = filterState.lanPorts;
   writeUrlState(updates, { replace });
 }
 
@@ -194,6 +202,8 @@ function scheduleFilterUrlWrite() {
 function applyFiltersFromUrl() {
   const parsed = readFiltersFromUrl();
   filterState.q = parsed.q;
+  filterState.lanSpeed = parsed.lanSpeed;
+  filterState.lanPorts = parsed.lanPorts;
   filterState.ranges = parsed.ranges;
   filterState.includeUnknown = parsed.includeUnknown;
 
@@ -416,6 +426,10 @@ function isMetricLowerBetter(metricId) {
 
 function compareMetricRow(metricId, devices) {
   const values = devices.map(device => device[metricId] ?? null);
+  if (metricId === 'cpu_model' || metricId === 'ethernet_ports_mbps') {
+    const labels = values.map(value => formatDetailMetricValue(metricId, value));
+    return { metricId, values, labels, bestLabel: null, identical: labels.every(label => label === labels[0]) };
+  }
   const present = values.filter(value => typeof value === 'number' && Number.isFinite(value));
   if (!present.length) return null;
 
@@ -850,7 +864,7 @@ function getFiltered() {
 }
 
 function isAnyFilterActive() {
-  return filterState.q.trim().length > 0 || Object.keys(filterState.ranges).length > 0;
+  return filterState.q.trim().length > 0 || Object.keys(filterState.ranges).length > 0 || filterState.lanSpeed != null || filterState.lanPorts != null;
 }
 
 function formatDeviceCountLabel(shownCount) {
@@ -944,6 +958,9 @@ function clearAllFilters() {
   filterState.q = '';
   searchInputEl.value = '';
   filterState.ranges = {};
+  filterState.lanSpeed = null;
+  filterState.lanPorts = null;
+  syncLanControls();
   filterState.includeUnknown = false;
   FILTER_DEFS.forEach(def => syncFilterControlValue(def.id));
   const unknownCheckbox = document.getElementById('filter-include-unknown');
@@ -960,9 +977,10 @@ function updateFilterClearVisibility() {
 
 function renderFilterChips() {
   const active = FILTER_DEFS.filter(def => filterState.ranges[def.id] != null);
+  const lan = [['lanSpeed', filterState.lanSpeed == null ? null : `LAN: ≥ ${filterState.lanSpeed / 1000}G per port`], ['lanPorts', filterState.lanPorts == null ? null : 'LAN: 2+ ports']].filter(([, label]) => label);
   updateFilterClearVisibility();
 
-  if (!active.length && !filterState.includeUnknown) {
+  if (!active.length && !lan.length && !filterState.includeUnknown) {
     filterChipsEl.innerHTML = '';
     filterChipsEl.hidden = true;
     return;
@@ -976,7 +994,7 @@ function renderFilterChips() {
       ${escapeHtml(def.label)}: ${symbol} ${fmt(value)}${def.unit}
       <button type="button" class="filter-chip-remove" data-filter="${def.id}" aria-label="Remove ${escapeHtml(def.label)} filter">&times;</button>
     </span>`;
-  }).join('') + (filterState.includeUnknown ? `
+  }).join('') + lan.map(([field, label]) => `<span class="filter-chip" data-filter="${field}">${label}<button type="button" class="filter-chip-remove" data-filter="${field}" aria-label="Remove ${label} filter">&times;</button></span>`).join('') + (filterState.includeUnknown ? `
     <span class="filter-chip" data-filter="unknown">
       Including missing data
       <button type="button" class="filter-chip-remove" data-filter="unknown" aria-label="Exclude devices with missing data">&times;</button>
@@ -984,6 +1002,12 @@ function renderFilterChips() {
 
   filterChipsEl.querySelectorAll('.filter-chip-remove').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (btn.dataset.filter === 'lanSpeed' || btn.dataset.filter === 'lanPorts') {
+        filterState[btn.dataset.filter] = null;
+        syncLanControls();
+        onFilterStateChanged();
+        return;
+      }
       if (btn.dataset.filter !== 'unknown') {
         clearFilterRange(btn.dataset.filter);
         return;
@@ -1021,6 +1045,16 @@ function renderFilterPanel() {
         <summary>${escapeHtml(group.label)}</summary>
         <div class="filter-section-body">${FILTER_DEFS.filter(def => def.group === group.id).map(def => rows.get(def.id)).join('')}</div>
       </details>`).join('')}
+    <details class="filter-section" data-filter-group="lan" ${firstRender || openGroups.has('lan') || filterState.lanSpeed != null || filterState.lanPorts != null ? 'open' : ''}>
+      <summary>LAN</summary>
+      <div class="filter-section-body">
+        <label class="filter-label" for="filter-lan-speed">Minimum port speed</label>
+        <p id="lan-rule" class="filter-coverage">At least one port supports this speed or faster.</p>
+        <p class="filter-coverage">Data for ${DEVICES.filter(device => device.ethernet_ports_mbps != null).length} of ${DEVICES.length} devices</p>
+        <select id="filter-lan-speed" aria-describedby="lan-rule"><option value="">Any speed</option>${LAN_SPEEDS.map(speed => `<option value="${speed}" ${filterState.lanSpeed === speed ? 'selected' : ''}>${speed / 1000}G</option>`).join('')}</select>
+        <label class="filter-checkbox-label"><input type="checkbox" id="filter-lan-ports" ${filterState.lanPorts === 2 ? 'checked' : ''}><span>2+ ports</span></label>
+      </div>
+    </details>
     <div class="filter-row filter-row-unknown">
       <label class="filter-checkbox-label">
         <input type="checkbox" id="filter-include-unknown" ${filterState.includeUnknown ? 'checked' : ''}>
@@ -1079,11 +1113,27 @@ function renderFilterPanel() {
     onFilterStateChanged();
   });
 
+  document.getElementById('filter-lan-speed').addEventListener('change', event => {
+    filterState.lanSpeed = event.target.value ? Number(event.target.value) : null;
+    onFilterStateChanged();
+  });
+  document.getElementById('filter-lan-ports').addEventListener('change', event => {
+    filterState.lanPorts = event.target.checked ? 2 : null;
+    onFilterStateChanged();
+  });
+
   document.getElementById('filter-clear')?.addEventListener('click', () => {
     clearAllFilters();
   });
 
   updateFilterClearVisibility();
+}
+
+function syncLanControls() {
+  const speed = document.getElementById('filter-lan-speed');
+  const ports = document.getElementById('filter-lan-ports');
+  if (speed) speed.value = filterState.lanSpeed ?? '';
+  if (ports) ports.checked = filterState.lanPorts === 2;
 }
 
 function ensureValidSortColumn() {
@@ -1335,6 +1385,13 @@ async function loadData() {
     ({ DEVICES, MAX_H, MIN_L, FILTER_BOUNDS } = normalizeDevices(data));
     favorites = loadFavorites();
     syncFavoriteControls();
+    try {
+      const specsResponse = await fetch(SPECS_URL, { cache: 'no-store' });
+      if (!specsResponse.ok) throw new Error(`HTTP ${specsResponse.status}`);
+      applyDeviceSpecs(await specsResponse.json());
+    } catch (error) {
+      throw new Error(`device-specs.json: ${error.message}`);
+    }
     compareSelection = loadCompareSelection();
     applyFiltersFromUrl();
     updateSiteMeta();
@@ -1348,7 +1405,24 @@ async function loadData() {
     loadLinks();
   } catch (error) {
     console.error(error);
-    setErrorState('Could not load devices.json. Serve this folder over HTTP or open the GitHub Pages site instead of using file://.');
+    setErrorState(`Could not load benchmark or specification data: ${error.message}. Serve this folder over HTTP or open the GitHub Pages site instead of using file://.`);
+  }
+}
+
+function applyDeviceSpecs(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Expected an object keyed by device ID');
+  const byId = new Map(DEVICES.map(device => [device.id, device]));
+  for (const [id, record] of Object.entries(data)) {
+    if (!byId.has(id)) throw new Error(`Unknown device ID: ${id}`);
+    if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Error(`Invalid record: ${id}`);
+    const unexpected = Object.keys(record).find(field => !['cpu_model', 'ethernet_ports_mbps'].includes(field));
+    if (unexpected) throw new Error(`Unexpected specification field ${unexpected}: ${id}. Sync the data-only export.`);
+    const ports = record.ethernet_ports_mbps;
+    if (ports != null && (!Array.isArray(ports) || ports.some(speed => !LAN_SPEEDS.includes(speed)))) throw new Error(`Invalid Ethernet ports: ${id}`);
+    if (record.cpu_model != null && (typeof record.cpu_model !== 'string' || !record.cpu_model.trim())) throw new Error(`Invalid processor model: ${id}`);
+    for (const field of ['cpu_model', 'ethernet_ports_mbps']) {
+      byId.get(id)[field] = record[field] ?? null;
+    }
   }
 }
 

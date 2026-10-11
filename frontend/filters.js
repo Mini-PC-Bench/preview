@@ -21,6 +21,16 @@ function deviceMatchesFilters(device, state) {
   const q = state.q.trim().toLowerCase();
   if (q && !device.name.toLowerCase().includes(q)) return false;
 
+  if (state.lanSpeed != null || state.lanPorts != null) {
+    const ports = device.ethernet_ports_mbps;
+    if (ports == null) {
+      if (!state.includeUnknown) return false;
+    } else {
+      if (state.lanSpeed != null && !ports.some(speed => speed >= state.lanSpeed)) return false;
+      if (state.lanPorts != null && ports.length < state.lanPorts) return false;
+    }
+  }
+
   for (const def of FILTER_DEFS) {
     const limit = state.ranges[def.id];
     if (limit == null) continue;

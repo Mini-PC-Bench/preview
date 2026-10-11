@@ -14,6 +14,10 @@ Static benchmark comparison page for mini PCs, designed to be hosted on GitHub P
 - `device-links.json` - editorial links keyed by device id
 - `recommendations.json` - playlist ID and video records rendered in the Recommendations grid
 - `scripts/source/update-recommendations.ps1` - refreshes recommendation records from the YouTube playlist
+- `device-specs.json` - data-only reviewed processor identities and Ethernet port speeds, manually synced from the research repository
+- `schemas/device-specs-public.schema.json` - public data contract, manually synced alongside the specification data
+- `scripts/devices/pull-device-specs.ps1` - pulls reviewed research values and their public schema into this repository
+- `scripts/ci/validate-device-specs.ps1` - validates the public specification fields and catalog IDs
 - `source-device-map.json` - reviewed raw source-label ownership mappings used by the importer
 - `scripts/devices/sync-device-links.ps1` - adds missing empty link entries from `devices.json`
 - `scripts/devices/validate-device-links.ps1` - resolves and sanity-checks YouTube and Amazon device links
@@ -254,6 +258,7 @@ Use this workflow each time you review a new device.
 4. Keep field names exactly as shown below.
 5. Save the files and refresh the page.
 6. Check table view, chart view, search, and the device details popup.
+7. Add the new ID to the separate research catalog, research/review it there, and follow [manual specification sync](#specification-data-and-manual-sync). Benchmark imports never rewrite researched specifications.
 
 #### Copy/Paste Template
 
@@ -359,6 +364,28 @@ Use this workflow each time you review a new device.
 - `kind`: Short type tag. Current UI has built-in icons for `affiliate` and `youtube`.
 - Link order is preserved exactly as written in `device-links.json`.
 - If a mini PC has no links yet, use an empty array: `"device-id": []`.
+
+## Specification Data and Manual Sync
+
+This repository renders reviewed specifications from its data-only `device-specs.json`, validated against the synced `schemas/device-specs-public.schema.json`. Research records, evidence, authoritative schemas, immutable source snapshots, coverage reports, and proposal validation live in the separate research repository. This repository owns the manual pull, metadata stripping, and public-data validation.
+
+After validating the research repository, run this command from the rendering checkout, supplying the path to its local checkout:
+
+```powershell
+pwsh -NoProfile -File ./scripts/devices/pull-device-specs.ps1 -SpecsRepo /path/to/device-specs
+```
+
+The helper reads the authoritative research `device-specs.json` and `schemas/device-specs-public.schema.json`, selects public fields from that schema, requires reviewed evidence for every non-null value (including an empty array), and strips evidence, dates, and other metadata. It validates the projected data against the incoming schema and this repository’s `devices.json` before replacing both local files. Failed input or validation leaves the existing pair intact
+
+The initial fields are `cpu_model` and `ethernet_ports_mbps`, one Mbps value per physical Ethernet port. Supported speeds are 1000, 2500, 5000, and 10000.
+
+Script tests live in `tests/scripts` with the `.Tests.ps1` suffix. Run the pull tests with `pwsh -NoProfile -File ./tests/scripts/pull-device-specs.Tests.ps1`.
+
+Omitted fields are unresearched:
+- `null` means researched but unresolved,
+- `[]` means confirmed absence of wired Ethernet.
+
+LAN speed choices require at least one physical port supporting that speed or faster. The independent "2+ ports" choice combines with it. Missing Ethernet data follows "Include devices with missing data"; a confirmed empty array fails active LAN filters. Details and comparison show per-port speeds without adding them together, and filtering does not recalculate dataset-relative benchmark scores. Shared URLs use `lan_min=2500`, `lan_ports_min=2`, and `unknown=1`.
 
 ## Source Data Workflow
 

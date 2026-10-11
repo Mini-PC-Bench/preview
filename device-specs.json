@@ -1,0 +1,21 @@
+{
+  "asus-nuc-15-pro-ultra-9-285h": {
+    "cpu_model": "Intel Core Ultra 9 285H",
+    "ethernet_ports_mbps": [
+      2500
+    ]
+  },
+  "geekom-it15-ultra-9-285h": {
+    "cpu_model": "Intel Core Ultra 9 285H",
+    "ethernet_ports_mbps": [
+      2500
+    ]
+  },
+  "minisforum-ai-x1-pro-hx-470": {
+    "cpu_model": "AMD Ryzen AI 9 HX 470",
+    "ethernet_ports_mbps": [
+      2500,
+      2500
+    ]
+  }
+}
