@@ -27,6 +27,12 @@ try {
   [IO.File]::WriteAllText($sourceData, $valid)
   & $pull -SpecsRepo $source -Root $rendering
   $output = Get-Content -Raw $targetData | ConvertFrom-Json -AsHashtable
+  [IO.File]::WriteAllText($sourceData, $valid.Replace('Reviewed CPU', 'AMD Ryzen AI Max+ 395'))
+  & $pull -SpecsRepo $source -Root $rendering
+  $readable = [IO.File]::ReadAllText($targetData)
+  Assert-PullCheck (($readable | ConvertFrom-Json -AsHashtable).dual.cpu_model -ceq 'AMD Ryzen AI Max+ 395' -and $readable.Contains('"cpu_model": "AMD Ryzen AI Max+ 395"')) 'Pull changed or escaped the processor model'
+  [IO.File]::WriteAllText($sourceData, $valid)
+  & $pull -SpecsRepo $source -Root $rendering
   Assert-PullCheck ($output.dual.ethernet_ports_mbps.Count -eq 2 -and $output.none.ethernet_ports_mbps.Count -eq 0 -and $null -eq $output.unknown.ethernet_ports_mbps -and -not $output.omitted.Contains('ethernet_ports_mbps')) 'Pull lost port counts or unknown/omitted/empty-array semantics'
   Assert-PullCheck (-not $output.dual.Contains('evidence') -and -not $output.dual.Contains('date')) 'Pull leaked research metadata'
   Assert-PullCheck ([IO.File]::ReadAllText($sourceData) -ceq $valid) 'Pull changed the research source'

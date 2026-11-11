@@ -42,6 +42,7 @@ try {
   $stream = [IO.MemoryStream]::new()
   $options = [System.Text.Json.JsonWriterOptions]::new()
   $options.Indented = $true
+  $options.Encoder = [System.Text.Encodings.Web.JavaScriptEncoder]::UnsafeRelaxedJsonEscaping
   $writer = [System.Text.Json.Utf8JsonWriter]::new($stream, $options)
   $writer.WriteStartObject()
   foreach ($device in ($research.RootElement.EnumerateObject() | Sort-Object Name -CaseSensitive)) {
