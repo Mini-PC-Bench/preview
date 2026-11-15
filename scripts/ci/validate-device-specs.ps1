@@ -18,6 +18,9 @@ try {
     if (-not $ids.Add($device.id)) { throw "Duplicate catalog device ID: $($device.id)" }
   }
   $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+  # Mirrors slugCpuFacet in frontend/filters.js: filter ids must map to exactly one label.
+  $slug = { param([string]$value) ($value.ToLowerInvariant().Trim() -replace '[^a-z0-9]+', '-') -replace '^-|-$', '' }
+  $facetIds = [System.Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
   foreach ($record in $document.RootElement.EnumerateObject()) {
     if (-not $seen.Add($record.Name)) { throw "Duplicate specification device ID: $($record.Name)" }
     if (-not $ids.Contains($record.Name)) { throw "Unknown specification device ID: $($record.Name)" }
@@ -36,6 +39,19 @@ try {
     $hasFamily = $recordElement.TryGetProperty('cpu_family', [ref]$family) -and $family.ValueKind -eq 'String'
     if ($hasModel -and (-not $hasBrand -or -not $hasFamily)) { throw "Processor model is missing facets: $($record.Name)" }
     if ($hasBrand -ne $hasFamily) { throw "Incomplete processor facet: $($record.Name)" }
+    if ($hasBrand) {
+      $brandName = $brand.GetString()
+      $familyName = $family.GetString()
+      $brandId = & $slug $brandName
+      $familySlug = & $slug $familyName
+      if (-not $brandId -or -not $familySlug) { throw "Processor facet has no filter ID: $($record.Name)" }
+      foreach ($facet in @(@($brandId, $brandName), @("$brandId-$familySlug", "$brandName / $familyName"))) {
+        $existing = $null
+        if ($facetIds.TryGetValue($facet[0], [ref]$existing)) {
+          if ($existing -cne $facet[1]) { throw "Processor facets '$existing' and '$($facet[1])' share filter ID $($facet[0]): $($record.Name)" }
+        } else { $facetIds[$facet[0]] = $facet[1] }
+      }
+    }
   }
   Write-Output "Data-only specifications validated: $($seen.Count)/$($ids.Count) devices."
 } finally { $document.Dispose() }

@@ -105,7 +105,7 @@ The report is written to `device-links-report.md`. To check one device, use:
 3. Set the source to deploy from your default branch.
 4. Open the published URL after Pages finishes building.
 
-The page fetches `devices.json`, `device-links.json`, and `recommendations.json` at runtime, so it should be served over HTTP or HTTPS. Opening the HTML directly with `file://` will usually fail because browsers block local `fetch()` requests.
+The page fetches `devices.json`, `device-specs.json`, `device-links.json`, and `recommendations.json` at runtime, so it should be served over HTTP or HTTPS. Opening the HTML directly with `file://` will usually fail because browsers block local `fetch()` requests.
 
 ## Local Preview
 
@@ -367,7 +367,7 @@ Use this workflow each time you review a new device.
 
 ## Specification Data and Manual Sync
 
-This repository renders reviewed specifications from its data-only `device-specs.json`, validated against the synced `schemas/device-specs-public.schema.json`. Research records, evidence, authoritative schemas, immutable source snapshots, coverage reports, and proposal validation live in the separate research repository. This repository owns the manual pull, metadata stripping, and public-data validation.
+This repository renders reviewed specifications from its data-only `device-specs.json`, validated against the synced `schemas/device-specs-public.schema.json`. Research records, evidence, authoritative schemas, immutable source snapshots, coverage reports, and proposal validation live in the separate research repository. This repository owns the manual pull, metadata stripping, and public-data validation. At runtime the specs are optional: if `device-specs.json` fails to load, the page hides the Processor and LAN filters, and any individual invalid or unknown record is skipped with a console warning. CI validation is what keeps bad data from shipping.
 
 After validating the research repository, run this command from the rendering checkout, supplying the path to its local checkout:
 

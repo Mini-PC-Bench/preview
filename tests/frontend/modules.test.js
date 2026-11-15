@@ -14,7 +14,7 @@ async function main() {
     format: 'esm',
     write: false
   });
-  const { normalizeDevices, normalizeDeviceLinks, cpuFacetChoices, deviceMatchesFilters, formatDetailMetricValue, renderDetailLinks, renderDetailPhoto } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
+  const { normalizeDevices, normalizeDeviceLinks, createCpuFacet, cpuFacetChoices, deviceMatchesFilters, formatDetailMetricValue, renderDetailLinks, renderDetailPhoto } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
 
   const input = [
     { name: 'Mini Alpha!', cb23s: 100, cb23m: 200, cb23s_perf: 200, watts: 20, watts_perf: 40, handbrake: 30, image: ' photo.webp ', noise: { load_default: 25 } },
@@ -66,6 +66,23 @@ async function main() {
   assert.equal(deviceMatchesFilters({ name: 'Unknown', cpu_model: null, cpuFacet: null }, cpuState), false);
   assert.equal(deviceMatchesFilters({ name: 'Unknown', cpu_model: null, cpuFacet: null }, { ...cpuState, includeUnknown: true }), true);
   assert.equal(deviceMatchesFilters({ name: 'A', cpu_model: 'Intel Processor N100' }, { ...cpuState, cpu: [], q: 'n100' }), true);
+  const precomputed = { name: 'P', cpuFacet: createCpuFacet('AMD', 'Ryzen 7') };
+  assert.deepEqual(precomputed.cpuFacet, { brand: 'AMD', family: 'Ryzen 7', brandId: 'amd', familyId: 'amd-ryzen-7' });
+  assert.equal(deviceMatchesFilters(precomputed, cpuState), true);
+  assert.equal(deviceMatchesFilters(precomputed, { ...cpuState, cpu: ['amd'] }), true);
+  assert.equal(deviceMatchesFilters(precomputed, { ...cpuState, cpu: ['intel'] }), false);
+
+  const lanState = { q: '', ranges: {}, cpu: [], lanSpeed: null, lanPorts: null, includeUnknown: false };
+  const lan = ports => ({ name: 'L', ethernet_ports_mbps: ports });
+  assert.equal(deviceMatchesFilters(lan([2500]), { ...lanState, lanSpeed: 2500 }), true);
+  assert.equal(deviceMatchesFilters(lan([10000]), { ...lanState, lanSpeed: 2500 }), true);
+  assert.equal(deviceMatchesFilters(lan([1000, 1000]), { ...lanState, lanSpeed: 2500 }), false);
+  assert.equal(deviceMatchesFilters(lan([1000, 10000]), { ...lanState, lanSpeed: 10000, lanPorts: 2 }), true);
+  assert.equal(deviceMatchesFilters(lan([2500]), { ...lanState, lanPorts: 2 }), false);
+  assert.equal(deviceMatchesFilters(lan([]), { ...lanState, lanSpeed: 1000 }), false);
+  assert.equal(deviceMatchesFilters(lan(null), { ...lanState, lanSpeed: 1000 }), false);
+  assert.equal(deviceMatchesFilters(lan(null), { ...lanState, lanSpeed: 1000, includeUnknown: true }), true);
+  assert.equal(deviceMatchesFilters(lan(null), lanState), true);
 
   const links = normalizeDeviceLinks([null, { url: ' https://example.com ', label: ' Shop ', kind: ' AFFILIATE ' }, { url: 'https://example.com' }, { url: ' ' }]);
   assert.deepEqual(links, [{ url: 'https://example.com', label: 'Shop', kind: 'affiliate', logo: '' }]);

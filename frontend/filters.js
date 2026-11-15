@@ -20,6 +20,13 @@ function slugCpuFacet(value) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+// Builds a device's CPU facet with its filter ids computed once, so matching
+// does not re-slug every device on every filter change.
+function createCpuFacet(brand, family) {
+  const brandId = slugCpuFacet(brand);
+  return { brand, family, brandId, familyId: `${brandId}-${slugCpuFacet(family)}` };
+}
+
 function cpuFacetChoices(devices) {
   const brands = new Map();
   for (const device of devices) {
@@ -50,8 +57,8 @@ function deviceMatchesFilters(device, state) {
     if (!device.cpuFacet) {
       if (!state.includeUnknown) return false;
     } else {
-      const brandId = slugCpuFacet(device.cpuFacet.brand);
-      const familyId = `${brandId}-${slugCpuFacet(device.cpuFacet.family)}`;
+      const facet = device.cpuFacet;
+      const { brandId, familyId } = facet.brandId ? facet : createCpuFacet(facet.brand, facet.family);
       if (!state.cpu.includes(brandId) && !state.cpu.includes(familyId)) return false;
     }
   }
@@ -83,4 +90,4 @@ function deviceMatchesFilters(device, state) {
   return true;
 }
 
-export { FILTER_GROUPS, FILTER_DEFS, cpuFacetChoices, deviceMatchesFilters };
+export { FILTER_GROUPS, FILTER_DEFS, createCpuFacet, cpuFacetChoices, deviceMatchesFilters };

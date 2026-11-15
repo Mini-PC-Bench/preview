@@ -65,3 +65,24 @@ test('search includes full processor model and unknown CPU data follows the miss
   await page.locator('#filter-include-unknown').check();
   await expect(rows(page)).toHaveCount(devices.length - 1);
 });
+
+test('specification problems degrade to hidden filters instead of breaking the page', async ({ page }) => {
+  const devices = await (await page.request.get('/devices.json')).json();
+  const specs = await (await page.request.get('/device-specs.json')).json();
+  const [validId, badId] = Object.keys(specs);
+  await page.route('**/device-specs.json', route => route.fulfill({ json: {
+    [validId]: specs[validId],
+    [badId]: { ...specs[badId], ethernet_ports_mbps: [100] },
+    'no-such-device': specs[validId]
+  } }));
+  await page.goto('/');
+  await expect(rows(page)).toHaveCount(devices.length);
+  await expect(page.locator('.filter-section[data-filter-group="cpu"] .filter-coverage').first()).toHaveText(`Data for 1 of ${devices.length} devices (${Math.round(1 / devices.length * 100)}%)`);
+
+  await page.unroute('**/device-specs.json');
+  await page.route('**/device-specs.json', route => route.fulfill({ status: 404, body: '' }));
+  await page.goto('/?lan_min=2500&cpu=amd');
+  await expect(rows(page)).toHaveCount(devices.length);
+  await expect(page.locator('.filter-section[data-filter-group="cpu"]')).toHaveCount(0);
+  await expect(page.locator('.filter-section[data-filter-group="lan"]')).toHaveCount(0);
+});
