@@ -910,7 +910,7 @@ function setFilterPanelOpen(isOpen, { restoreFocus = false, focus = true, save =
   filterToggleBtn.setAttribute('aria-expanded', String(isOpen));
   document.getElementById('filter-toggle-label').textContent = isOpen ? 'Hide filters' : 'Show filters';
   if (isOpen && focus) {
-    const firstInput = Array.from(filterPanelEl.querySelectorAll('details[open] input:not(:disabled)'))
+    const firstInput = Array.from(filterPanelEl.querySelectorAll('details[open] :is(input, select):not(:disabled)'))
       .find(input => !input.closest('details:not([open])') && input.getClientRects().length > 0);
     (firstInput ?? filterPanelEl.querySelector('summary'))?.focus({ preventScroll: true });
   } else if (restoreFocus && wasOpen) filterToggleBtn.focus({ preventScroll: true });
@@ -1087,13 +1087,8 @@ function renderFilterPanel() {
         </details>`).join('')}
       </div>
     </details>` : ''}
-    ${FILTER_GROUPS.map(group => `
-      <details class="filter-section" data-filter-group="${group.id}" ${firstRender || openGroups.has(group.id) || FILTER_DEFS.some(def => def.group === group.id && filterState.ranges[def.id] != null) ? 'open' : ''}>
-        <summary>${escapeHtml(group.label)}</summary>
-        <div class="filter-section-body">${FILTER_DEFS.filter(def => def.group === group.id).map(def => rows.get(def.id)).join('')}</div>
-      </details>`).join('')}
     ${HAS_LAN_DATA ? `
-    <details class="filter-section" data-filter-group="lan" ${firstRender || openGroups.has('lan') || filterState.lanSpeed != null || filterState.lanPorts != null ? 'open' : ''}>
+    <details class="filter-section" data-filter-group="lan" ${openGroups.has('lan') || filterState.lanSpeed != null || filterState.lanPorts != null ? 'open' : ''}>
       <summary>LAN</summary>
       <div class="filter-section-body">
         <div class="filter-row">
@@ -1112,6 +1107,11 @@ function renderFilterPanel() {
         </div>
       </div>
     </details>` : ''}
+    ${FILTER_GROUPS.map(group => `
+      <details class="filter-section" data-filter-group="${group.id}" ${firstRender || openGroups.has(group.id) || FILTER_DEFS.some(def => def.group === group.id && filterState.ranges[def.id] != null) ? 'open' : ''}>
+        <summary>${escapeHtml(group.label)}</summary>
+        <div class="filter-section-body">${FILTER_DEFS.filter(def => def.group === group.id).map(def => rows.get(def.id)).join('')}</div>
+      </details>`).join('')}
     <div class="filter-row filter-row-unknown">
       <label class="filter-checkbox-label">
         <input type="checkbox" id="filter-include-unknown" ${filterState.includeUnknown ? 'checked' : ''}>

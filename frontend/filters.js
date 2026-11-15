@@ -3,8 +3,8 @@
 const FILTER_GROUPS = [
   { id: 'benchmarks', label: 'Benchmarks' },
   { id: 'power', label: 'Power' },
-  { id: 'physical', label: 'Physical' },
-  { id: 'noise', label: 'Noise' }
+  { id: 'noise', label: 'Noise' },
+  { id: 'physical', label: 'Physical' }
 ];
 const FILTER_DEFS = [
   { id: 'watts', group: 'power', label: 'Max power draw', unit: 'W', mode: 'max', step: 5 },
