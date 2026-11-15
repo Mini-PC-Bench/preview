@@ -6,6 +6,8 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "cpu_brand": { "type": ["string", "null"], "minLength": 1 },
+      "cpu_family": { "type": ["string", "null"], "minLength": 1 },
       "cpu_model": { "type": ["string", "null"], "minLength": 1 },
       "ethernet_ports_mbps": {
         "type": ["array", "null"],

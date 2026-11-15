@@ -19,6 +19,28 @@ function Assert-UniquePullKeys([System.Text.Json.JsonElement]$Element) {
   }
 }
 
+function Get-CpuFacet([string]$Model) {
+  if ([string]::IsNullOrWhiteSpace($Model)) { return @{ Brand = $null; Family = $null; Unknown = $false } }
+  $normalized = [regex]::Replace($Model.Trim(), '\s+', ' ')
+  [void]($normalized -match '^(?<brand>\S+)')
+  $brand = $Matches.brand
+  if ($brand -ceq 'AMD') {
+    $family = if ($normalized -match '^AMD Ryzen AI Max\+?(?:\s|$)') { 'Ryzen AI Max' }
+      elseif ($normalized -match '^AMD Ryzen AI (?<tier>\d+)(?:\s|$)') { "Ryzen AI $($Matches.tier)" }
+      elseif ($normalized -match '^AMD Ryzen (?<tier>\d+)(?:\s|$)') { "Ryzen $($Matches.tier)" }
+      else { 'Other' }
+  } elseif ($brand -ceq 'Intel') {
+    $family = if ($normalized -match '^Intel Core Ultra (?<tier>X?\d+)(?:\s|$)') { "Core Ultra $($Matches.tier)" }
+      elseif ($normalized -match '^Intel Core i(?<tier>\d+)(?:-|\s|$)') { "Core i$($Matches.tier)" }
+      elseif ($normalized -match '^Intel Core (?<tier>\d+)(?:\s|$)') { "Core $($Matches.tier)" }
+      elseif ($normalized -match '^Intel Processor N\d+(?:\s|$)') { 'Processor N' }
+      else { 'Other' }
+  } else {
+    $family = 'Other'
+  }
+  return @{ Brand = $brand; Family = $family; Unknown = $family -eq 'Other' }
+}
+
 $Root = [IO.Path]::GetFullPath($Root)
 $SpecsRepo = [IO.Path]::GetFullPath($SpecsRepo)
 if ($Root -eq $SpecsRepo) { throw 'Research and rendering repositories must be different directories' }
@@ -32,12 +54,12 @@ try {
   [void][IO.Directory]::CreateDirectory($temporary)
   $encoding = [Text.UTF8Encoding]::new($false, $true)
   $research = [System.Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText((Join-Path $SpecsRepo 'device-specs.json'), $encoding))
-  $schemaBytes = [IO.File]::ReadAllBytes((Join-Path $SpecsRepo 'schemas/device-specs-public.schema.json'))
-  $schema = [System.Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText((Join-Path $SpecsRepo 'schemas/device-specs-public.schema.json'), $encoding))
+  $schemaText = [IO.File]::ReadAllText((Join-Path $SpecsRepo 'schemas/device-specs-public.schema.json'), $encoding)
+  $schema = [System.Text.Json.JsonDocument]::Parse($schemaText)
   Assert-UniquePullKeys $research.RootElement
   Assert-UniquePullKeys $schema.RootElement
   if ($research.RootElement.ValueKind -ne 'Object') { throw 'Research specifications must be an object keyed by device ID' }
-  $fields = @($schema.RootElement.GetProperty('additionalProperties').GetProperty('properties').EnumerateObject() | ForEach-Object Name)
+  $fields = @($schema.RootElement.GetProperty('additionalProperties').GetProperty('properties').EnumerateObject() | ForEach-Object Name | Where-Object { $_ -notin @('cpu_brand', 'cpu_family') })
   if ($fields -contains 'evidence') { throw 'Public schema must not expose evidence' }
   $stream = [IO.MemoryStream]::new()
   $options = [System.Text.Json.JsonWriterOptions]::new()
@@ -63,6 +85,14 @@ try {
       $writer.WritePropertyName($field)
       $value.WriteTo($writer)
     }
+    $modelElement = [System.Text.Json.JsonElement]::new()
+    $model = if ($device.Value.TryGetProperty('cpu_model', [ref]$modelElement) -and $modelElement.ValueKind -eq 'String') { $modelElement.GetString() } else { $null }
+    $facet = Get-CpuFacet $model
+    if ($facet.Unknown) { Write-Warning "Unclassified CPU family '$model' for $($device.Name); exported under '$($facet.Brand) / Other'." }
+    $writer.WritePropertyName('cpu_brand')
+    if ($null -eq $facet.Brand) { $writer.WriteNullValue() } else { $writer.WriteStringValue($facet.Brand) }
+    $writer.WritePropertyName('cpu_family')
+    if ($null -eq $facet.Family) { $writer.WriteNullValue() } else { $writer.WriteStringValue($facet.Family) }
     $writer.WriteEndObject()
   }
   $writer.WriteEndObject()
@@ -70,7 +100,14 @@ try {
   $specsPath = Join-Path $temporary 'device-specs.json'
   $schemaPath = Join-Path $temporary 'device-specs-public.schema.json'
   [IO.File]::WriteAllText($specsPath, $encoding.GetString($stream.ToArray()) + "`n", [Text.UTF8Encoding]::new($false))
-  [IO.File]::WriteAllBytes($schemaPath, $schemaBytes)
+  $schemaOutput = $schemaText | ConvertFrom-Json -AsHashtable
+  $properties = $schemaOutput.additionalProperties.properties
+  foreach ($field in @('cpu_brand', 'cpu_family')) {
+    if (-not $properties.Contains($field)) {
+      $properties[$field] = @{ type = @('string', 'null'); minLength = 1 }
+    }
+  }
+  [IO.File]::WriteAllText($schemaPath, ($schemaOutput | ConvertTo-Json -Depth 100) + "`n", [Text.UTF8Encoding]::new($false))
   & (Join-Path $PSScriptRoot '../ci/validate-device-specs.ps1') -SpecsPath $specsPath -DevicesPath (Join-Path $Root 'devices.json') -SchemaPath $schemaPath
 
   # Prepare both files before replacing either; restore the previous pair if installation fails.
@@ -95,7 +132,7 @@ try {
     }
     throw
   }
-  Write-Output 'Pulled reviewed specifications and public schema. Research metadata stripped; source repository unchanged.'
+  Write-Output 'Pulled reviewed specifications and generated CPU facets. Research metadata stripped; source repository unchanged.'
 } finally {
   foreach ($file in $files) { if ($file.ContainsKey('Prepared') -and [IO.File]::Exists($file.Prepared)) { [IO.File]::Delete($file.Prepared) } }
   if ($writer) { $writer.Dispose() }

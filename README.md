@@ -375,9 +375,11 @@ After validating the research repository, run this command from the rendering ch
 pwsh -NoProfile -File ./scripts/devices/pull-device-specs.ps1 -SpecsRepo /path/to/device-specs
 ```
 
-The helper reads the authoritative research `device-specs.json` and `schemas/device-specs-public.schema.json`, selects public fields from that schema, requires reviewed evidence for every non-null value (including an empty array), and strips evidence, dates, and other metadata. It validates the projected data against the incoming schema and this repository’s `devices.json` before replacing both local files. Failed input or validation leaves the existing pair intact
+The helper reads the authoritative research `device-specs.json` and `schemas/device-specs-public.schema.json`, selects public fields from that schema, requires reviewed evidence for every non-null value (including an empty array), and strips evidence, dates, and other metadata. It derives `cpu_brand` and `cpu_family` from `cpu_model`, warns and assigns unrecognized families to `Other`, then validates the projected data and extended public schema against this repository’s `devices.json` before replacing both local files. Failed input or validation leaves the existing pair intact.
 
 The initial fields are `cpu_model` and `ethernet_ports_mbps`, one Mbps value per physical Ethernet port. Supported speeds are 1000, 2500, 5000, and 10000.
+
+CPU brand and family must either both be populated or both be missing/null, even when the model is omitted. A populated model requires both facets.
 
 Script tests live in `tests/scripts` with the `.Tests.ps1` suffix. Run the pull tests with `pwsh -NoProfile -File ./tests/scripts/pull-device-specs.Tests.ps1`.
 
@@ -386,6 +388,8 @@ Omitted fields are unresearched:
 - `[]` means confirmed absence of wired Ethernet.
 
 LAN speed choices require at least one physical port supporting that speed or faster. The independent "2+ ports" choice combines with it. Missing Ethernet data follows "Include devices with missing data"; a confirmed empty array fails active LAN filters. Details and comparison show per-port speeds without adding them together, and filtering does not recalculate dataset-relative benchmark scores. Shared URLs use `lan_min=2500`, `lan_ports_min=2`, and `unknown=1`.
+
+The Processor filter builds its brand and family choices from the imported `cpu_brand` and `cpu_family` values, so new families appear without a frontend taxonomy change. Multiple selections match any selected family and combine with the other filters; missing CPU data follows "Include devices with missing data". Search matches device names and full CPU model strings. Shared URLs use facet IDs such as `cpu=amd-ryzen-7,intel-processor-n`.
 
 ## Source Data Workflow
 

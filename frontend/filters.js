@@ -16,10 +16,45 @@ const FILTER_DEFS = [
   { id: 'cb23m', group: 'benchmarks', label: 'Min Cinebench R23 multi-core', unit: 'pts', mode: 'min', step: 500 }
 ];
 
+function slugCpuFacet(value) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function cpuFacetChoices(devices) {
+  const brands = new Map();
+  for (const device of devices) {
+    const facet = device.cpuFacet;
+    if (!facet) continue;
+    if (!brands.has(facet.brand)) brands.set(facet.brand, new Map());
+    const families = brands.get(facet.brand);
+    families.set(facet.family, (families.get(facet.family) ?? 0) + 1);
+  }
+  return [...brands].sort(([a], [b]) => a.localeCompare(b)).map(([brand, families]) => ({
+    id: slugCpuFacet(brand),
+    label: brand,
+    count: [...families.values()].reduce((sum, count) => sum + count, 0),
+    families: [...families].sort(([a], [b]) => a.localeCompare(b)).map(([family, count]) => ({
+      id: `${slugCpuFacet(brand)}-${slugCpuFacet(family)}`,
+      label: family,
+      count
+    }))
+  }));
+}
+
 // Pure: reads only its arguments plus FILTER_DEFS, so it never depends on render state.
 function deviceMatchesFilters(device, state) {
   const q = state.q.trim().toLowerCase();
-  if (q && !device.name.toLowerCase().includes(q)) return false;
+  if (q && !device.name.toLowerCase().includes(q) && !device.cpu_model?.toLowerCase().includes(q)) return false;
+
+  if (state.cpu?.length) {
+    if (!device.cpuFacet) {
+      if (!state.includeUnknown) return false;
+    } else {
+      const brandId = slugCpuFacet(device.cpuFacet.brand);
+      const familyId = `${brandId}-${slugCpuFacet(device.cpuFacet.family)}`;
+      if (!state.cpu.includes(brandId) && !state.cpu.includes(familyId)) return false;
+    }
+  }
 
   if (state.lanSpeed != null || state.lanPorts != null) {
     const ports = device.ethernet_ports_mbps;
@@ -48,4 +83,4 @@ function deviceMatchesFilters(device, state) {
   return true;
 }
 
-export { FILTER_GROUPS, FILTER_DEFS, deviceMatchesFilters };
+export { FILTER_GROUPS, FILTER_DEFS, cpuFacetChoices, deviceMatchesFilters };

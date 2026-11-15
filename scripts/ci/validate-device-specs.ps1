@@ -25,7 +25,17 @@ try {
     foreach ($field in $record.Value.EnumerateObject()) {
       if (-not $fields.Add($field.Name)) { throw "Duplicate specification field: $($record.Name).$($field.Name)" }
       if ($field.Name -eq 'cpu_model' -and $field.Value.ValueKind -eq 'String' -and -not $field.Value.GetString().Trim()) { throw "Empty processor model: $($record.Name)" }
+      if ($field.Name -in @('cpu_brand', 'cpu_family') -and $field.Value.ValueKind -eq 'String' -and -not $field.Value.GetString().Trim()) { throw "Empty processor facet: $($record.Name).$($field.Name)" }
     }
+    $recordElement = $record.Value
+    $model = [System.Text.Json.JsonElement]::new()
+    $brand = [System.Text.Json.JsonElement]::new()
+    $family = [System.Text.Json.JsonElement]::new()
+    $hasModel = $recordElement.TryGetProperty('cpu_model', [ref]$model) -and $model.ValueKind -eq 'String'
+    $hasBrand = $recordElement.TryGetProperty('cpu_brand', [ref]$brand) -and $brand.ValueKind -eq 'String'
+    $hasFamily = $recordElement.TryGetProperty('cpu_family', [ref]$family) -and $family.ValueKind -eq 'String'
+    if ($hasModel -and (-not $hasBrand -or -not $hasFamily)) { throw "Processor model is missing facets: $($record.Name)" }
+    if ($hasBrand -ne $hasFamily) { throw "Incomplete processor facet: $($record.Name)" }
   }
   Write-Output "Data-only specifications validated: $($seen.Count)/$($ids.Count) devices."
 } finally { $document.Dispose() }

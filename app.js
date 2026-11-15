@@ -1,4 +1,4 @@
-import { FILTER_GROUPS, FILTER_DEFS, deviceMatchesFilters } from './frontend/filters.js';
+import { FILTER_GROUPS, FILTER_DEFS, cpuFacetChoices, deviceMatchesFilters } from './frontend/filters.js';
 import { TABLE_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from './frontend/table-columns.js';
 import { BENCH_HIGHER, BENCH_LOWER, normalizeDevices, normalizeDeviceLinks } from './frontend/data.js';
 import { fmt, fmtD, escapeHtml, clamp } from './frontend/format.js';
@@ -24,6 +24,7 @@ const FAVORITES_STORAGE_KEY = 'minipc-benchmarks.favorites';
 const META_SUFFIX = 'Cinebench R23 &nbsp;·&nbsp; Geekbench 6 &nbsp;·&nbsp; 3DMark &nbsp;·&nbsp; H264 &nbsp;·&nbsp; Power draw &nbsp;·&nbsp; Efficiency score';
 
 let DEVICES = [];
+let CPU_CHOICES = [];
 let MAX_H = {};
 let MIN_L = {};
 let FILTER_BOUNDS = {};
@@ -33,6 +34,7 @@ let sortDir = -1;
 let filterState = {
   lanSpeed: null,
   lanPorts: null,
+  cpu: [],
   q: '',
   ranges: {},
   includeUnknown: false
@@ -159,6 +161,8 @@ function urlParamNameForFilter(def) {
 function readFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const ranges = {};
+  const cpuRequested = new Set((params.get('cpu') ?? '').split(','));
+  const cpuChoices = CPU_CHOICES;
 
   FILTER_DEFS.forEach(def => {
     const raw = params.get(urlParamNameForFilter(def));
@@ -171,6 +175,7 @@ function readFiltersFromUrl() {
 
   return {
     q: getUrlParam(QUERY_TEXT_PARAM) ?? '',
+    cpu: [...cpuRequested].filter(id => cpuChoices.some(brand => brand.id === id || (!cpuRequested.has(brand.id) && brand.families.some(family => family.id === id)))),
     lanSpeed: LAN_SPEEDS.includes(Number(params.get('lan_min'))) ? Number(params.get('lan_min')) : null,
     lanPorts: params.get('lan_ports_min') === '2' ? 2 : null,
     ranges,
@@ -189,6 +194,7 @@ function writeFilterStateToUrl({ replace = true } = {}) {
   updates[INCLUDE_UNKNOWN_PARAM] = filterState.includeUnknown ? '1' : null;
   updates.lan_min = filterState.lanSpeed;
   updates.lan_ports_min = filterState.lanPorts;
+  updates.cpu = filterState.cpu.length ? filterState.cpu.join(',') : null;
   writeUrlState(updates, { replace });
 }
 
@@ -204,6 +210,7 @@ function applyFiltersFromUrl() {
   filterState.q = parsed.q;
   filterState.lanSpeed = parsed.lanSpeed;
   filterState.lanPorts = parsed.lanPorts;
+  filterState.cpu = parsed.cpu;
   filterState.ranges = parsed.ranges;
   filterState.includeUnknown = parsed.includeUnknown;
 
@@ -864,7 +871,7 @@ function getFiltered() {
 }
 
 function isAnyFilterActive() {
-  return filterState.q.trim().length > 0 || Object.keys(filterState.ranges).length > 0 || filterState.lanSpeed != null || filterState.lanPorts != null;
+  return filterState.q.trim().length > 0 || Object.keys(filterState.ranges).length > 0 || filterState.lanSpeed != null || filterState.lanPorts != null || filterState.cpu.length > 0;
 }
 
 function formatDeviceCountLabel(shownCount) {
@@ -899,8 +906,11 @@ function setFilterPanelOpen(isOpen, { restoreFocus = false, focus = true, save =
   benchmarkLayoutEl.classList.toggle('filters-collapsed', !isOpen);
   filterToggleBtn.setAttribute('aria-expanded', String(isOpen));
   document.getElementById('filter-toggle-label').textContent = isOpen ? 'Hide filters' : 'Show filters';
-  if (isOpen && focus) filterPanelEl.querySelector('details[open] input')?.focus({ preventScroll: true });
-  else if (restoreFocus && wasOpen) filterToggleBtn.focus({ preventScroll: true });
+  if (isOpen && focus) {
+    const firstInput = Array.from(filterPanelEl.querySelectorAll('details[open] input:not(:disabled)'))
+      .find(input => !input.closest('details:not([open])') && input.getClientRects().length > 0);
+    (firstInput ?? filterPanelEl.querySelector('summary'))?.focus({ preventScroll: true });
+  } else if (restoreFocus && wasOpen) filterToggleBtn.focus({ preventScroll: true });
   if (save) saveFilterPanelPreference(isOpen);
   requestAnimationFrame(syncFloatingTableHeader);
 }
@@ -960,7 +970,9 @@ function clearAllFilters() {
   filterState.ranges = {};
   filterState.lanSpeed = null;
   filterState.lanPorts = null;
+  filterState.cpu = [];
   syncLanControls();
+  syncCpuControls();
   filterState.includeUnknown = false;
   FILTER_DEFS.forEach(def => syncFilterControlValue(def.id));
   const unknownCheckbox = document.getElementById('filter-include-unknown');
@@ -978,9 +990,14 @@ function updateFilterClearVisibility() {
 function renderFilterChips() {
   const active = FILTER_DEFS.filter(def => filterState.ranges[def.id] != null);
   const lan = [['lanSpeed', filterState.lanSpeed == null ? null : `LAN: ≥ ${filterState.lanSpeed / 1000}G per port`], ['lanPorts', filterState.lanPorts == null ? null : 'LAN: 2+ ports']].filter(([, label]) => label);
+  const cpuChoices = CPU_CHOICES;
+  const cpu = filterState.cpu.map(id => {
+    const brand = cpuChoices.find(choice => choice.id === id || choice.families.some(family => family.id === id));
+    return { id, label: brand.id === id ? brand.label : `${brand.label} ${brand.families.find(family => family.id === id).label}` };
+  });
   updateFilterClearVisibility();
 
-  if (!active.length && !lan.length && !filterState.includeUnknown) {
+  if (!active.length && !lan.length && !cpu.length && !filterState.includeUnknown) {
     filterChipsEl.innerHTML = '';
     filterChipsEl.hidden = true;
     return;
@@ -994,7 +1011,7 @@ function renderFilterChips() {
       ${escapeHtml(def.label)}: ${symbol} ${fmt(value)}${def.unit}
       <button type="button" class="filter-chip-remove" data-filter="${def.id}" aria-label="Remove ${escapeHtml(def.label)} filter">&times;</button>
     </span>`;
-  }).join('') + lan.map(([field, label]) => `<span class="filter-chip" data-filter="${field}">${label}<button type="button" class="filter-chip-remove" data-filter="${field}" aria-label="Remove ${label} filter">&times;</button></span>`).join('') + (filterState.includeUnknown ? `
+  }).join('') + lan.map(([field, label]) => `<span class="filter-chip" data-filter="${field}">${label}<button type="button" class="filter-chip-remove" data-filter="${field}" aria-label="Remove ${label} filter">&times;</button></span>`).join('') + cpu.map(({ id, label }) => `<span class="filter-chip">CPU: ${escapeHtml(label)}<button type="button" class="filter-chip-remove" data-cpu="${id}" aria-label="Remove ${escapeHtml(label)} filter">&times;</button></span>`).join('') + (filterState.includeUnknown ? `
     <span class="filter-chip" data-filter="unknown">
       Including missing data
       <button type="button" class="filter-chip-remove" data-filter="unknown" aria-label="Exclude devices with missing data">&times;</button>
@@ -1002,6 +1019,12 @@ function renderFilterChips() {
 
   filterChipsEl.querySelectorAll('.filter-chip-remove').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (btn.dataset.cpu) {
+        filterState.cpu = filterState.cpu.filter(id => id !== btn.dataset.cpu);
+        syncCpuControls();
+        onFilterStateChanged();
+        return;
+      }
       if (btn.dataset.filter === 'lanSpeed' || btn.dataset.filter === 'lanPorts') {
         filterState[btn.dataset.filter] = null;
         syncLanControls();
@@ -1022,6 +1045,7 @@ function renderFilterChips() {
 function renderFilterPanel() {
   const openGroups = new Set(Array.from(filterPanelEl.querySelectorAll('details[open]'), section => section.dataset.filterGroup));
   const firstRender = !filterPanelEl.childElementCount;
+  const cpuChoices = CPU_CHOICES;
   const rows = new Map(FILTER_DEFS.map(def => {
     const bounds = FILTER_BOUNDS[def.id] ?? { min: 0, max: 0, present: 0 };
     const active = filterState.ranges[def.id];
@@ -1040,6 +1064,19 @@ function renderFilterPanel() {
   }));
 
   filterPanelEl.innerHTML = `
+    <details class="filter-section" data-filter-group="cpu" ${openGroups.has('cpu') || filterState.cpu.length ? 'open' : ''}>
+      <summary>Processor</summary>
+      <div class="filter-section-body cpu-filter-body">
+        <p class="filter-coverage">Data for ${DEVICES.filter(device => device.cpu_model != null).length} of ${DEVICES.length} devices</p>
+        ${cpuChoices.map(brand => `<details class="cpu-brand" data-cpu-brand="${brand.id}" ${filterState.cpu.some(id => id === brand.id || brand.families.some(family => family.id === id)) ? 'open' : ''}>
+          <summary>${escapeHtml(brand.label)} <span class="filter-coverage">(${brand.count})</span></summary>
+          <div class="cpu-family-list">
+            <label class="filter-checkbox-label"><input type="checkbox" data-cpu="${brand.id}" ${filterState.cpu.includes(brand.id) ? 'checked' : ''}><span>All ${escapeHtml(brand.label)}</span></label>
+            ${brand.families.filter(family => family.id !== brand.id).map(family => `<label class="filter-checkbox-label"><input type="checkbox" data-cpu="${family.id}" data-brand="${brand.id}" ${filterState.cpu.includes(family.id) ? 'checked' : ''} ${filterState.cpu.includes(brand.id) ? 'disabled' : ''}><span>${escapeHtml(family.label)} (${family.count})</span></label>`).join('')}
+          </div>
+        </details>`).join('')}
+      </div>
+    </details>
     ${FILTER_GROUPS.map(group => `
       <details class="filter-section" data-filter-group="${group.id}" ${firstRender || openGroups.has(group.id) || FILTER_DEFS.some(def => def.group === group.id && filterState.ranges[def.id] != null) ? 'open' : ''}>
         <summary>${escapeHtml(group.label)}</summary>
@@ -1122,6 +1159,18 @@ function renderFilterPanel() {
     onFilterStateChanged();
   });
 
+  filterPanelEl.querySelectorAll('input[data-cpu]').forEach(input => input.addEventListener('change', event => {
+    const { cpu: id, brand } = event.target.dataset;
+    if (brand && filterState.cpu.includes(brand)) return;
+    filterState.cpu = filterState.cpu.filter(selected => selected !== id);
+    if (event.target.checked) {
+      if (!brand) filterState.cpu = filterState.cpu.filter(selected => !cpuChoices.find(choice => choice.id === id)?.families.some(family => family.id === selected));
+      filterState.cpu.push(id);
+    }
+    syncCpuControls();
+    onFilterStateChanged();
+  }));
+
   document.getElementById('filter-clear')?.addEventListener('click', () => {
     clearAllFilters();
   });
@@ -1134,6 +1183,13 @@ function syncLanControls() {
   const ports = document.getElementById('filter-lan-ports');
   if (speed) speed.value = filterState.lanSpeed ?? '';
   if (ports) ports.checked = filterState.lanPorts === 2;
+}
+
+function syncCpuControls() {
+  filterPanelEl.querySelectorAll('input[data-cpu]').forEach(input => {
+    input.checked = filterState.cpu.includes(input.dataset.cpu);
+    input.disabled = !!input.dataset.brand && filterState.cpu.includes(input.dataset.brand);
+  });
 }
 
 function ensureValidSortColumn() {
@@ -1415,15 +1471,21 @@ function applyDeviceSpecs(data) {
   for (const [id, record] of Object.entries(data)) {
     if (!byId.has(id)) throw new Error(`Unknown device ID: ${id}`);
     if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Error(`Invalid record: ${id}`);
-    const unexpected = Object.keys(record).find(field => !['cpu_model', 'ethernet_ports_mbps'].includes(field));
+    const unexpected = Object.keys(record).find(field => !['cpu_model', 'cpu_brand', 'cpu_family', 'ethernet_ports_mbps'].includes(field));
     if (unexpected) throw new Error(`Unexpected specification field ${unexpected}: ${id}. Sync the data-only export.`);
     const ports = record.ethernet_ports_mbps;
     if (ports != null && (!Array.isArray(ports) || ports.some(speed => !LAN_SPEEDS.includes(speed)))) throw new Error(`Invalid Ethernet ports: ${id}`);
     if (record.cpu_model != null && (typeof record.cpu_model !== 'string' || !record.cpu_model.trim())) throw new Error(`Invalid processor model: ${id}`);
-    for (const field of ['cpu_model', 'ethernet_ports_mbps']) {
+    if (record.cpu_brand != null && (typeof record.cpu_brand !== 'string' || !record.cpu_brand.trim())) throw new Error(`Invalid processor brand: ${id}`);
+    if (record.cpu_family != null && (typeof record.cpu_family !== 'string' || !record.cpu_family.trim())) throw new Error(`Invalid processor family: ${id}`);
+    if ((record.cpu_brand == null) !== (record.cpu_family == null)) throw new Error(`Incomplete processor facet: ${id}`);
+    if (record.cpu_model != null && record.cpu_brand == null) throw new Error(`Processor model is missing facets: ${id}`);
+    for (const field of ['cpu_model', 'cpu_brand', 'cpu_family', 'ethernet_ports_mbps']) {
       byId.get(id)[field] = record[field] ?? null;
     }
+    byId.get(id).cpuFacet = record.cpu_brand == null ? null : { brand: record.cpu_brand, family: record.cpu_family };
   }
+  CPU_CHOICES = cpuFacetChoices(DEVICES);
 }
 
 async function loadLinks() {
