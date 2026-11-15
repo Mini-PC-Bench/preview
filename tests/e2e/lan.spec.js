@@ -95,10 +95,28 @@ for (const failure of ['http', 'network', 'unknown-id', 'evidence', 'bad-speed',
       if (failure === 'http') return route.fulfill({ status: 503, body: 'unavailable' });
       if (failure === 'malformed-json') return route.fulfill({ contentType: 'application/json', body: '{invalid' });
       const id = failure === 'unknown-id' ? 'unknown-device' : devices[0].id;
-      return route.fulfill({ json: { [id]: { ethernet_ports_mbps: [failure === 'bad-speed' ? 500 : 2500], ...(failure === 'evidence' ? { evidence: {} } : {}) } } });
+      // A valid record next to the bad one must not be applied either: specs are all-or-nothing.
+      return route.fulfill({ json: {
+        [devices[1].id]: { cpu_model: 'Intel Core i3-N305', cpu_brand: 'Intel', cpu_family: 'Core i3', ethernet_ports_mbps: [2500] },
+        [id]: { ethernet_ports_mbps: [failure === 'bad-speed' ? 500 : 2500], ...(failure === 'evidence' ? { evidence: {} } : {}) }
+      } });
     });
-    await page.goto('/');
-    await expect(page.locator('#count')).toHaveText('Load failed');
-    await expect(page.locator('#benchmark-table tbody')).toContainText('device-specs.json');
+    // Spec filters in a shared link are ignored rather than hiding every device.
+    await page.goto('/?lan_min=2500&cpu=intel');
+    const warning = page.locator('#specs-warning');
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText('device-specs.json');
+    await expect(rows(page)).toHaveCount(devices.length);
+    await expect(page.locator('#count')).not.toHaveText('Load failed');
+    await expect(page.locator('.filter-chip')).toHaveCount(0);
+    await page.locator('#filter-toggle').click();
+    await expect(page.locator('.filter-section[data-filter-group="cpu"]')).toHaveCount(0);
+    await expect(page.locator('.filter-section[data-filter-group="lan"]')).toHaveCount(0);
+    await page.locator(`.device-name-trigger[data-device-id="${devices[1].id}"]`).click();
+    const detail = page.locator('#device-detail-overlay');
+    await expect(detail).toBeVisible();
+    await expect(detail).not.toContainText('Processor model');
+    await expect(detail).not.toContainText('Ethernet ports');
+    await expect(detail).not.toContainText('Unknown');
   });
 }

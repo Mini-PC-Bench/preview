@@ -36,6 +36,22 @@
   display: none;
 }
 
+.specs-warning {
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--border));
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--amber) 10%, var(--surface));
+  color: var(--text);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.specs-warning[hidden] {
+  display: none;
+}
+
 .filter-chip {
   display: inline-flex;
   align-items: center;

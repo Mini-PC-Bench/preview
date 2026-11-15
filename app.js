@@ -436,6 +436,7 @@ function isMetricLowerBetter(metricId) {
 function compareMetricRow(metricId, devices) {
   const values = devices.map(device => device[metricId] ?? null);
   if (metricId === 'cpu_model' || metricId === 'ethernet_ports_mbps') {
+    if (values.every(value => value === undefined)) return null;
     const labels = values.map(value => formatDetailMetricValue(metricId, value));
     return { metricId, values, labels, bestLabel: null, identical: labels.every(label => label === labels[0]) };
   }
@@ -1483,10 +1484,7 @@ async function loadData() {
         if (!specsResponse.ok) throw new Error(`HTTP ${specsResponse.status}`);
         return specsResponse.json();
       })
-      .catch(error => {
-        console.warn(`device-specs.json unavailable; processor and LAN filters disabled: ${error.message}`);
-        return null;
-      });
+      .then(data => ({ data }), error => ({ error: error.message }));
     const response = await fetch(DATA_URL, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -1495,7 +1493,8 @@ async function loadData() {
     ({ DEVICES, MAX_H, MIN_L, FILTER_BOUNDS } = normalizeDevices(data));
     favorites = loadFavorites();
     syncFavoriteControls();
-    applyDeviceSpecs(await specsRequest);
+    const specs = await specsRequest;
+    showSpecsWarning(specs.error ?? applyDeviceSpecs(specs.data));
     compareSelection = loadCompareSelection();
     applyFiltersFromUrl();
     updateSiteMeta();
@@ -1530,31 +1529,41 @@ function specRecordProblem(record) {
   return null;
 }
 
-// Applies valid records and skips the rest with a warning, so one bad record
-// only loses that device's specs instead of the whole page.
+// Specs are all-or-nothing: any problem leaves every device without spec fields
+// (so nothing is shown as "Unknown" by mistake) and returns a message for the
+// banner. Benchmarks stay usable either way. Returns null on success.
 function applyDeviceSpecs(data) {
   HAS_LAN_DATA = false;
   CPU_CHOICES = [];
-  if (data == null) return;
-  if (typeof data !== 'object' || Array.isArray(data)) {
-    console.warn('device-specs.json: expected an object keyed by device ID; processor and LAN filters disabled');
-    return;
-  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return 'expected an object keyed by device ID';
   const byId = new Map(DEVICES.map(device => [device.id, device]));
-  const problems = [];
+  const problems = Object.entries(data)
+    .map(([id, record]) => {
+      const problem = byId.has(id) ? specRecordProblem(record) : 'unknown device ID';
+      return problem && `${id}: ${problem}`;
+    })
+    .filter(Boolean);
+  if (problems.length) {
+    console.error(`device-specs.json rejected:\n${problems.join('\n')}`);
+    return `${problems.length} invalid record${problems.length === 1 ? '' : 's'} (first: ${problems[0]})`;
+  }
   for (const [id, record] of Object.entries(data)) {
     const device = byId.get(id);
-    const problem = device ? specRecordProblem(record) : 'unknown device ID';
-    if (problem) {
-      problems.push(`${id}: ${problem}`);
-      continue;
-    }
     for (const field of SPEC_FIELDS) device[field] = record[field] ?? null;
     device.cpuFacet = record.cpu_brand == null ? null : createCpuFacet(record.cpu_brand, record.cpu_family);
   }
-  if (problems.length) console.warn(`device-specs.json: skipped ${problems.length} record(s)\n${problems.join('\n')}`);
   HAS_LAN_DATA = DEVICES.some(device => device.ethernet_ports_mbps != null);
   CPU_CHOICES = cpuFacetChoices(DEVICES);
+  return null;
+}
+
+function showSpecsWarning(message) {
+  const warning = document.getElementById('specs-warning');
+  if (!warning) return;
+  warning.hidden = !message;
+  warning.textContent = message
+    ? `Could not load device-specs.json (${message}). Processor and LAN details and filters are unavailable; benchmark data is unaffected.`
+    : '';
 }
 
 async function loadLinks() {

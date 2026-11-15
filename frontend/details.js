@@ -74,6 +74,9 @@ const DETAIL_METRICS = {
 };
 
 function formatDetailMetricValue(metricId, value) {
+  // undefined means no spec data was loaded for the device: omit the row.
+  // null is a reviewed "unknown" and is shown as such.
+  if ((metricId === 'cpu_model' || metricId === 'ethernet_ports_mbps') && value === undefined) return null;
   if (metricId === 'cpu_model') return value ?? 'Unknown';
   if (metricId === 'ethernet_ports_mbps') {
     if (value == null) return 'Unknown';

@@ -367,7 +367,7 @@ Use this workflow each time you review a new device.
 
 ## Specification Data and Manual Sync
 
-This repository renders reviewed specifications from its data-only `device-specs.json`, validated against the synced `schemas/device-specs-public.schema.json`. Research records, evidence, authoritative schemas, immutable source snapshots, coverage reports, and proposal validation live in the separate research repository. This repository owns the manual pull, metadata stripping, and public-data validation. At runtime the specs are optional: if `device-specs.json` fails to load, the page hides the Processor and LAN filters, and any individual invalid or unknown record is skipped with a console warning. CI validation is what keeps bad data from shipping.
+This repository renders reviewed specifications from its data-only `device-specs.json`, validated against the synced `schemas/device-specs-public.schema.json`. Research records, evidence, authoritative schemas, immutable source snapshots, coverage reports, and proposal validation live in the separate research repository. This repository owns the manual pull, metadata stripping, and public-data validation. At runtime the specs are all-or-nothing: if `device-specs.json` fails to load or contains any invalid or unknown record, none of it is applied, so no device is shown as "Unknown" by mistake. The page shows a visible warning, hides the Processor and LAN filters and spec details, and keeps the benchmark data usable. CI validation is what keeps bad data from shipping.
 
 After validating the research repository, run this command from the rendering checkout, supplying the path to its local checkout:
 
